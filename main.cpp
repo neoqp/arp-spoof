@@ -76,6 +76,7 @@ void packet_handler(u_char *param, const struct pcap_pkthdr *header, const u_cha
     }
 }
 
+uint8_t my_mac[6];
 
 int main(int argc, char* argv[]) {
 	if (argc <4 || (argc%2)!=0) {
@@ -93,7 +94,6 @@ int main(int argc, char* argv[]) {
 		return -1;
 	}
 	
-	uint8_t my_mac[6];
 	GetMacAddr(dev, my_mac);
 
 	EthArpPacket packet;
@@ -120,9 +120,10 @@ int main(int argc, char* argv[]) {
 		}
 		Mac sender_mac = arp_hdr->smac();
 		if(send_packet_arp(Mac(sender_mac),Mac(my_mac),Mac(sender_mac),Ip(argv[2*i+1]),Ip(argv[2*i]),false)==0){
-			printf("Target %d Attacked!\n", i);
+			printf("attack\n");
 		}
 	}
+	printf("attack All\n");
 
 	pcap_loop(handle, 0, packet_handler, NULL);
 	pcap_close(handle);
