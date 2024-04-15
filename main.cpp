@@ -156,7 +156,7 @@ int main(int argc, char* argv[]) {
 			for(i=0;i<infect_cnt;i++){
 				if(sender_ip[i]==reinfect_sender) break;
 			}
-			if(i!=-1){
+			if(i!=infect_cnt){
 				if(send_packet_arp(Mac(arp_hdr->smac()),my_mac,Mac(arp_hdr->smac()),arp_hdr->tip(), arp_hdr->sip(),false)==0){
 				printf("reinfect!\n");
 				}
@@ -167,7 +167,7 @@ int main(int argc, char* argv[]) {
 			for(i=0;i<infect_cnt;i++){
 				if(sender_mac[i]==ethernet_hdr->smac_) break;
 			}
-			if(i!=-1){
+			if(i!=infect_cnt){
 				ethernet_hdr->dmac_ = target_mac[i];
 				ethernet_hdr->smac_ = my_mac;
 				if(pcap_sendpacket(handle, rcvpacket, header->len)!=0){
