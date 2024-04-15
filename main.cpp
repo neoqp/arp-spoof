@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
+#include <time.h>
 
 #pragma pack(push, 1)
 struct EthArpPacket final {
@@ -137,6 +138,7 @@ int main(int argc, char* argv[]) {
 	PEthHdr ethernet_hdr;
 	PArpHdr arp_hdr;
 
+	clock_t start_time=clock();
 	while(true){
 		int res = pcap_next_ex(handle, &header, &rcvpacket);
 		printf("rcv packet!\n");
@@ -177,6 +179,14 @@ int main(int argc, char* argv[]) {
 					printf("Packet sent succesfully.\n");
 				}
 			}
+		}
+
+		clock_t current_time = clock();
+		double elapsed_seconds = (double)(current_time - start_time) / CLOCKS_PER_SEC;
+
+		if(elapsed_seconds >= 10){
+			int i;
+			for(i=0;i<infect_cnt;i++) send_packet_arp(sender_mac[i],my_mac,sender_mac[i],Ip(target_ip[i]),Ip(sender_ip[i]), false);
 		}
 	}
 
