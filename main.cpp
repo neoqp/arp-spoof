@@ -187,6 +187,7 @@ int main(int argc, char* argv[]) {
 		if(elapsed_seconds >= 10){
 			int i;
 			for(i=0;i<infect_cnt;i++) send_packet_arp(sender_mac[i],my_mac,sender_mac[i],Ip(target_ip[i]),Ip(sender_ip[i]), false);
+			start_time = clock();
 		}
 	}
 
