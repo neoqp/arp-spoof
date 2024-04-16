@@ -156,7 +156,7 @@ int main(int argc, char* argv[]) {
 
 			int i=-1;
 			for(i=0;i<infect_cnt;i++){
-				if(arp->sip()==sender_ip[i]&&arp->tip()==target_ip[i]) break;
+				if(arp_hdr->sip()==sender_ip[i]&&arp_hdr->tip()==target_ip[i]) break;
 			}
 			if(i!=infect_cnt){
 				if(send_packet_arp(Mac(arp_hdr->smac()),my_mac,Mac(arp_hdr->smac()),arp_hdr->tip(), arp_hdr->sip(),false)==0){
